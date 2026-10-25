@@ -1,0 +1,103 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<title>犯人は誰だ？</title>
+<meta name="description" content="屋敷を歩いて証拠を探し、仲間の中にいる犯人を当てる4〜8人の推理ゲーム。リンクを送るだけでスマホから遊べる。1プレイ5分。">
+<meta property="og:type" content="website">
+<meta property="og:title" content="犯人は誰だ？ 4〜8人で遊ぶ屋敷の推理ゲーム">
+<meta property="og:description" content="屋敷を歩いて証拠を探し、仲間の中にいる犯人を当てる。犯人は証拠を隠し、偽の証拠も置ける。リンクを送るだけでスマホから5分で遊べる。">
+<meta property="og:image" content="/og.png">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="theme-color" content="#17131a">
+<link rel="stylesheet" href="/style.css">
+<script>
+  // 起動に失敗したときに原因を画面に出す（module の読み込み自体が失敗すると中の catch は動かないため、素の script で拾う）
+  window.__errs = []
+  window.addEventListener('error', e => window.__errs.push(e.message || String(e)))
+  window.addEventListener('unhandledrejection', e => window.__errs.push(String(e.reason)))
+  setTimeout(() => {
+    if (window.__boot) return
+    const d = document.getElementById('bootErr')
+    d.hidden = false
+    d.textContent = '起動できませんでした: ' + (window.__errs.join(' / ') || '読み込み失敗') + ' / ' + navigator.userAgent
+  }, 5000)
+</script>
+</head>
+<body>
+<div id="bootErr" class="boot-err" hidden></div>
+
+<header class="top">
+  <span class="logo" id="logo"><svg class="logo-mark" viewBox="0 0 24 24" aria-hidden="true"><circle cx="10" cy="10" r="6.5" fill="none" stroke="currentColor" stroke-width="2.4"/><path d="M15 15l6 6" stroke="currentColor" stroke-width="3" stroke-linecap="round"/></svg>犯人は誰だ？</span>
+  <span class="net" id="net" data-s="connecting">接続しています</span>
+</header>
+
+<main>
+  <section id="home" class="card two" hidden>
+    <div class="col">
+      <h1 id="homeTitle">犯人は誰だ？</h1>
+      <p id="homeLead" class="lead">屋敷を歩いて証拠を探し、仲間の中にいる犯人を当てる。4〜8人・5分。</p>
+      <ol id="howto" class="howto">
+        <li>役割がひそかに配られる。犯人は1人</li>
+        <li>屋敷を歩き、家具を調べて証拠を集める</li>
+        <li>証拠は掲示板で共有。犯人は証拠を隠し、偽物も置ける</li>
+        <li>証拠と人物の特徴を照らし合わせて投票</li>
+      </ol>
+    </div>
+    <div class="col">
+      <label class="field">ニックネーム
+        <input id="name" maxlength="12" autocomplete="nickname" placeholder="例: たろう" enterkeyhint="done">
+      </label>
+      <button id="createBtn" class="primary">部屋を作る</button>
+      <details id="joinBox">
+        <summary>参加コードで入る</summary>
+        <div class="row">
+          <input id="code" maxlength="4" inputmode="latin" autocapitalize="characters" placeholder="ABCD" aria-label="参加コード">
+          <button id="joinBtn">参加</button>
+        </div>
+      </details>
+    </div>
+  </section>
+
+  <section id="lobby" class="card two" hidden>
+    <div class="col">
+      <p class="muted">参加コード</p>
+      <p class="code" id="roomCode"></p>
+      <div class="row">
+        <input id="invite" readonly aria-label="招待URL">
+        <button id="copyBtn">招待</button>
+      </div>
+      <div id="scenarioBox" class="scenario-box"></div>
+    </div>
+    <div class="col">
+      <p class="muted"><span id="count"></span>（4〜8人）</p>
+      <ul id="players" class="players"></ul>
+      <p id="lobbyHint" class="hint"></p>
+      <button id="startBtn" class="primary" hidden>スタート</button>
+      <button id="leaveBtn" class="ghost">部屋を出る</button>
+    </div>
+  </section>
+
+  <section id="game" hidden>
+    <div id="stage" class="stage"></div>
+    <button id="quitBtn" class="ghost small quit">退出</button>
+  </section>
+
+  <section id="result" class="card" hidden>
+    <h2 id="resultTitle" class="result-title"></h2>
+    <div id="resultBody" class="result-body"></div>
+    <p id="resultHint" class="hint"></p>
+    <div class="row result-btns">
+      <button id="rematchBtn" class="primary" hidden>もう一回</button>
+      <button id="lobbyBtn" class="ghost" hidden>ロビーに戻る</button>
+    </div>
+  </section>
+</main>
+
+<div id="toast" class="toast" role="status" hidden></div>
+<footer class="foot"><span id="ping"></span></footer>
+
+<script type="module" src="/app.js"></script>
+</body>
+</html>
