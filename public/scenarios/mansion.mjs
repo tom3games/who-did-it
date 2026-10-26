@@ -8,6 +8,9 @@
 export default {
   id: 'mansion',
   title: '霧ヶ丘の小さな屋敷',
+  level: 1,                 // 難しさ 1〜3（ロビーの星）
+  theme: 'mansion',         // 3D の見た目（外の景色・壁・天気）
+  exploreSec: 130,          // 探索の長さ（秒）。広い屋敷ほど長い
   lead: '雨の夜、屋敷の主人が書斎で倒れているのが見つかった。外は嵐で、屋敷にいたのはあなたたちだけ。',
   victim: '屋敷の主人 霧ヶ丘宗一郎',
   crimeTime: '21時40分ごろ',
@@ -30,6 +33,8 @@ export default {
     '############'
   ],
   rooms: { S: '書斎', B: '寝室', H: '廊下', D: '食堂', K: '台所', E: '玄関', G: '温室' },
+  // 床の張り方（3D と 2D の床の絵）
+  floors: { S: 'wood', B: 'carpet', H: 'rug', D: 'parquet', K: 'tile', E: 'stone', G: 'grass' },
   spawnRoom: 'E',
   crimeRoom: 'S',
   // x, y はマス（左上が 0,0）。icon は画面の描き分けに使う
@@ -44,7 +49,7 @@ export default {
     { id: 'table', x: 3, y: 9, name: '食卓', icon: 'table', text: '8人分の食器。デザートには誰も手をつけていない' },
     { id: 'cupboard', x: 1, y: 10, name: '食器棚', icon: 'cupboard', text: '銀のスプーンが1本足りない。でも前からだという' },
     { id: 'stove', x: 10, y: 8, name: 'かまど', icon: 'stove', text: '火は落ちている。灰はまだ少し温かい' },
-    { id: 'sink', x: 8, y: 10, name: '流し', icon: 'sink', text: '洗った皿が積んである。ふきんは乾いている' },
+    { id: 'sink', x: 10, y: 10, name: '流し', icon: 'sink', text: '洗った皿が積んである。ふきんは乾いている' },
     { id: 'umbrella', x: 1, y: 12, name: '傘立て', icon: 'umbrella', text: '濡れた傘が3本。今夜の嵐で使われたものだ' },
     { id: 'shoebox', x: 4, y: 14, name: '靴箱', icon: 'shoebox', text: '来客用のスリッパが並んでいる。数は合っている' },
     { id: 'pot', x: 9, y: 12, name: '植木鉢', icon: 'pot', text: 'ランの鉢。土は乾いていて、掘り返された跡はない' },
@@ -52,6 +57,8 @@ export default {
   ],
   // 人物の肩書き。参加順ではなく毎回くじで割り当てる
   cast: ['執事', '料理人', '庭師', '家庭教師', '甥', '主治医', '画家', 'メイド'],
+  // 肩書きごとの見た目（3D の帽子・小物と、似顔絵）
+  looks: { 執事: 'tophat', 料理人: 'chef', 庭師: 'straw', 家庭教師: 'glasses', 甥: 'cap', 主治医: 'mirror', 画家: 'beret', メイド: 'maid' },
   // 特徴。clue は「犯人がその特徴を持つ」ことを示す手がかりの文
   traits: [
     {

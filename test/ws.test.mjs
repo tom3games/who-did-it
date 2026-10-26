@@ -165,3 +165,21 @@ test('画面から rng などの変な opts を送ってもサーバーは落ち
     for (const c of cs) c.ws.close()
   } finally { await srv.close() }
 })
+
+test('ホストが選んだシナリオがロビーの全員に届く。ホスト以外は選べない', async () => {
+  const srv = await startServer({ port: 0, quiet: true })
+  try {
+    const a = client(srv.port), b = client(srv.port)
+    for (const c of [a, b]) { await c.ready; await c.wait(m => m.t === 'welcome') }
+    a.send({ t: 'create', name: 'A' })
+    const { code } = await a.wait(m => m.t === 'joined')
+    b.send({ t: 'join', code, name: 'B' }); await b.wait(m => m.t === 'joined')
+    a.send({ t: 'setup', opts: { scenario: 'lodge' } })
+    await b.wait(m => m.t === 'state' && m.setup?.scenario === 'lodge')
+    b.send({ t: 'setup', opts: { scenario: 'ship' } })
+    await b.wait(m => m.t === 'error' && m.code === 'not_host')
+    a.send({ t: 'setup', opts: { scenario: '<script>' } })
+    await b.wait(m => m.t === 'state' && m.setup && !('scenario' in m.setup))
+    for (const c of [a, b]) c.ws.close()
+  } finally { await srv.close() }
+})

@@ -3,97 +3,130 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
-<title>犯人は誰だ？</title>
-<meta name="description" content="屋敷を歩いて証拠を探し、仲間の中にいる犯人を当てる4〜8人の推理ゲーム。リンクを送るだけでスマホから遊べる。1プレイ5分。">
+<title>犯人は誰だ？ 4〜8人で遊ぶ3Dの推理ゲーム</title>
+<meta name="description" content="屋敷・豪華客船・雪山の山荘を3Dで歩いて証拠を探し、仲間の中にいる犯人を当てる4〜8人の推理ゲーム。雷・停電・嵐でだんだん難しくなる。リンクを送るだけでスマホから遊べる。">
 <meta property="og:type" content="website">
-<meta property="og:title" content="犯人は誰だ？ 4〜8人で遊ぶ屋敷の推理ゲーム">
-<meta property="og:description" content="屋敷を歩いて証拠を探し、仲間の中にいる犯人を当てる。犯人は証拠を隠し、偽の証拠も置ける。リンクを送るだけでスマホから5分で遊べる。">
+<meta property="og:title" content="犯人は誰だ？">
+<meta property="og:description" content="屋敷を歩いて証拠を探し、仲間の中の犯人を当てる。犯人は証拠を隠し、偽物も置ける。雷・停電・嵐でだんだん難しくなる。スマホで4〜8人。">
 <meta property="og:image" content="/og.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
 <meta name="twitter:card" content="summary_large_image">
-<meta name="theme-color" content="#17131a">
+<meta name="theme-color" content="#1b1630">
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Dela+Gothic+One&family=M+PLUS+Rounded+1c:wght@500;800;900&family=Zen+Antique&display=swap">
 <link rel="stylesheet" href="/style.css">
 <script>
   // 起動に失敗したときに原因を画面に出す（module の読み込み自体が失敗すると中の catch は動かないため、素の script で拾う）
   window.__errs = []
   window.addEventListener('error', e => window.__errs.push(e.message || String(e)))
   window.addEventListener('unhandledrejection', e => window.__errs.push(String(e.reason)))
-  setTimeout(() => {
+  // 遅い回線では 3D の読み込みに時間がかかるので、エラーが出たとき（8秒）か、20秒たっても起動しないときだけ出す。後から起動できたら app.js が消す
+  const showBootErr = () => {
     if (window.__boot) return
     const d = document.getElementById('bootErr')
     d.hidden = false
     d.textContent = '起動できませんでした: ' + (window.__errs.join(' / ') || '読み込み失敗') + ' / ' + navigator.userAgent
-  }, 5000)
+  }
+  setTimeout(() => { if (window.__errs.length) showBootErr() }, 8000)
+  setTimeout(showBootErr, 20000)
+  // ブラウザの拡大を止める（iOS は viewport の指定を無視するため）
+  ;(function () {
+    const stop = e => e.preventDefault()
+    for (const t of ['gesturestart', 'gesturechange', 'gestureend']) document.addEventListener(t, stop, { passive: false })
+    document.addEventListener('touchmove', e => { if (e.touches.length > 1) e.preventDefault() }, { passive: false })
+    let lastEnd = 0
+    document.addEventListener('touchend', e => {
+      const now = Date.now()
+      if (now - lastEnd < 350 && !e.target.closest('input, button, summary, label, a')) e.preventDefault()
+      lastEnd = now
+    }, { passive: false })
+    document.addEventListener('dblclick', stop, { passive: false })
+    document.addEventListener('wheel', e => { if (e.ctrlKey) e.preventDefault() }, { passive: false })
+    document.addEventListener('keydown', e => { if ((e.ctrlKey || e.metaKey) && ['+', '-', '=', '0'].includes(e.key)) e.preventDefault() })
+  })()
 </script>
 </head>
-<body>
+<body data-screen="home">
 <div id="bootErr" class="boot-err" hidden></div>
+<div class="bg" aria-hidden="true"><i class="bg-moon"></i><i class="bg-house"></i><i class="bg-rain"></i></div>
 
 <header class="top">
-  <span class="logo" id="logo"><svg class="logo-mark" viewBox="0 0 24 24" aria-hidden="true"><circle cx="10" cy="10" r="6.5" fill="none" stroke="currentColor" stroke-width="2.4"/><path d="M15 15l6 6" stroke="currentColor" stroke-width="3" stroke-linecap="round"/></svg>犯人は誰だ？</span>
+  <span class="mini-logo"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="10" cy="10" r="6.5" fill="rgba(170,220,255,.25)" stroke="#ffc94a" stroke-width="2.6"/><path d="M15 15l6 6" stroke="#ffc94a" stroke-width="3.4" stroke-linecap="round"/></svg>犯人は誰だ？</span>
   <span class="net" id="net" data-s="connecting">接続しています</span>
 </header>
 
 <main>
-  <section id="home" class="card two" hidden>
-    <div class="col">
-      <h1 id="homeTitle">犯人は誰だ？</h1>
-      <p id="homeLead" class="lead">屋敷を歩いて証拠を探し、仲間の中にいる犯人を当てる。4〜8人・5分。</p>
-      <ol id="howto" class="howto">
-        <li>役割がひそかに配られる。犯人は1人</li>
-        <li>屋敷を歩き、家具を調べて証拠を集める</li>
-        <li>証拠は掲示板で共有。犯人は証拠を隠し、偽物も置ける</li>
-        <li>証拠と人物の特徴を照らし合わせて投票</li>
-      </ol>
-    </div>
-    <div class="col">
-      <label class="field">ニックネーム
+  <section id="home" class="screen" hidden>
+    <div class="hero" id="hero"></div>
+    <div class="card">
+      <p class="card-head"><span>捜査ファイル</span><span>4〜8人・5分</span></p>
+      <label class="field"><span>あなたの名前</span>
         <input id="name" maxlength="12" autocomplete="nickname" placeholder="例: たろう" enterkeyhint="done">
       </label>
-      <button id="createBtn" class="primary">部屋を作る</button>
+      <button id="createBtn" class="btn primary">部屋を作る</button>
       <details id="joinBox">
         <summary>参加コードで入る</summary>
         <div class="row">
           <input id="code" maxlength="4" inputmode="latin" autocapitalize="characters" placeholder="ABCD" aria-label="参加コード">
-          <button id="joinBtn">参加</button>
+          <button id="joinBtn" class="btn">参加</button>
         </div>
       </details>
+      <div class="row home-sub">
+        <button id="howBtn" class="btn ghost">遊び方</button>
+        <p class="home-rec" id="homeRec"></p>
+      </div>
     </div>
   </section>
 
-  <section id="lobby" class="card two" hidden>
-    <div class="col">
-      <p class="muted">参加コード</p>
-      <p class="code" id="roomCode"></p>
+  <section id="lobby" class="screen" hidden>
+    <div class="card lobby">
+      <div class="lobby-top">
+        <div><p class="muted">参加コード</p><p class="code" id="roomCode"></p></div>
+        <p class="count" id="count"></p>
+      </div>
       <div class="row">
         <input id="invite" readonly aria-label="招待URL">
-        <button id="copyBtn">招待</button>
+        <button id="copyBtn" class="btn">招待</button>
       </div>
-      <div id="scenarioBox" class="scenario-box"></div>
-    </div>
-    <div class="col">
-      <p class="muted"><span id="count"></span>（4〜8人）</p>
       <ul id="players" class="players"></ul>
+      <div class="pick" id="scenarioPick"></div>
       <p id="lobbyHint" class="hint"></p>
-      <button id="startBtn" class="primary" hidden>スタート</button>
-      <button id="leaveBtn" class="ghost">部屋を出る</button>
+      <div class="row lobby-actions">
+        <button id="leaveBtn" class="btn ghost">部屋を出る</button>
+        <button id="startBtn" class="btn primary grow" hidden>スタート</button>
+      </div>
     </div>
   </section>
 
   <section id="game" hidden>
     <div id="stage" class="stage"></div>
-    <button id="quitBtn" class="ghost small quit">退出</button>
+    <button id="quitBtn" class="btn icon quit" aria-label="退出"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M14 4h5v16h-5M10 8l-4 4 4 4M6 12h10" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
   </section>
 
-  <section id="result" class="card" hidden>
-    <h2 id="resultTitle" class="result-title"></h2>
-    <div id="resultBody" class="result-body"></div>
-    <p id="resultHint" class="hint"></p>
-    <div class="row result-btns">
-      <button id="rematchBtn" class="primary" hidden>もう一回</button>
-      <button id="lobbyBtn" class="ghost" hidden>ロビーに戻る</button>
+  <section id="result" class="screen" hidden>
+    <div class="card result">
+      <h2 id="resultTitle" class="sr"></h2>
+      <div id="resultBody" class="result-body"></div>
+      <p id="resultHint" class="hint"></p>
+      <div class="row result-actions">
+        <button id="lobbyBtn" class="btn ghost" hidden>ロビーへ</button>
+        <button id="rematchBtn" class="btn primary grow" hidden>もう一回</button>
+      </div>
     </div>
   </section>
 </main>
+
+<div id="howto" class="modal" hidden role="dialog" aria-modal="true" aria-labelledby="howtoTitle">
+  <div class="card modal-card">
+    <p class="card-head" id="howtoTitle"><span>遊び方</span><span>犯人は1人</span></p>
+    <ol class="steps" id="steps"></ol>
+    <p class="howto-s">探索は3幕。雷が落ちると全員の居場所が記録に残り、停電で手元しか見えなくなり、嵐で扉が閉まる。PC は矢印キーで歩き、E で調べる。</p>
+    <button id="howClose" class="btn primary">わかった</button>
+  </div>
+</div>
 
 <div id="toast" class="toast" role="status" hidden></div>
 <footer class="foot"><span id="ping"></span></footer>

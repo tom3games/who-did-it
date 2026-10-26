@@ -6,13 +6,22 @@ import { readFile } from 'node:fs/promises'
 import { extname, join, normalize } from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 import { WebSocketServer } from 'ws'
+import { gzipSync } from 'node:zlib'
 import { RoomManager } from './lib/rooms.mjs'
 import * as gameDef from './lib/game.mjs'
 
 const ROOT = fileURLToPath(new URL('./public/', import.meta.url))
-const TYPES = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.mjs': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8', '.png': 'image/png', '.svg': 'image/svg+xml', '.json': 'application/json', '.ico': 'image/x-icon', '.webmanifest': 'application/manifest+json' }
+const TYPES = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.mjs': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8', '.png': 'image/png', '.jpg': 'image/jpeg', '.woff2': 'font/woff2', '.svg': 'image/svg+xml', '.json': 'application/json', '.ico': 'image/x-icon', '.webmanifest': 'application/manifest+json' }
 const MAX_MSG = 4096          // 1メッセージの上限（バイト）
 const MAX_INPUT_PER_SEC = 40  // 1接続あたりの操作の上限（毎秒）
+
+const gz = new Map() // 圧縮結果を中身ごとに覚える（index.html はホスト名で中身が変わるので中身で引く）
+function gzCache(file, body) {
+  const k = file + ':' + body.length + ':' + body.subarray(0, 64).toString('base64') + body.subarray(-64).toString('base64')
+  let z = gz.get(k)
+  if (!z) { z = gzipSync(body); if (gz.size > 200) gz.clear(); gz.set(k, z) }
+  return z
+}
 
 export function startServer({ port = Number(process.env.PORT) || 8102, quiet = false } = {}) {
   const sockets = new Map() // sessionId -> ws
@@ -43,7 +52,13 @@ export function startServer({ port = Number(process.env.PORT) || 8102, quiet = f
           body = Buffer.from(body.toString('utf8').replace('content="/og.png"', `content="${proto}://${host}/og.png"`))
         }
       }
-      res.writeHead(200, { 'content-type': TYPES[extname(file)] || 'application/octet-stream', 'cache-control': 'no-cache' })
+      const type = TYPES[extname(file)] || 'application/octet-stream'
+      // three.js（vendor）は変わらないので1日キャッシュ。文字のファイルは gzip で縮めて送る（3D の読み込みを軽くする）
+      const headers = { 'content-type': type, 'cache-control': path.startsWith('/vendor/') ? 'public, max-age=86400' : 'no-cache', vary: 'accept-encoding' }
+      if (/^text\/|svg/.test(type) && body.length > 1024 && /\bgzip\b/.test(String(req.headers['accept-encoding'] || ''))) {
+        body = gzCache(file, body); headers['content-encoding'] = 'gzip'
+      }
+      res.writeHead(200, headers)
       res.end(body)
     } catch {
       res.writeHead(404, { 'content-type': 'text/plain; charset=utf-8' }); res.end('not found')
@@ -93,6 +108,7 @@ export function startServer({ port = Number(process.env.PORT) || 8102, quiet = f
         case 'input': r = rooms.input(session, msg.data); break
         case 'rematch': r = rooms.rematch(session, msg.opts); break
         case 'lobby': r = rooms.backToLobby(session); break
+        case 'setup': r = rooms.setup(session, msg.opts); break
         case 'ping': return reply({ t: 'pong', at: msg.at })
         default: r = { error: 'unknown' }
       }
@@ -127,4 +143,4 @@ export function startServer({ port = Number(process.env.PORT) || 8102, quiet = f
   }))
 }
 
-if (import.meta.url === pathToFileURL(process.argv[1]).href) startServer()
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) startServer()

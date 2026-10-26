@@ -197,8 +197,8 @@ test('調べている途中に歩くと中断する。探偵は調べるのが�
 test('移動: 壁は抜けられない。扉は通れる。tick の細かさで速さが変わらない', () => {
   const { g, ps, d } = mk(4)
   toExplore(g, ps)
-  // 玄関の左上から上へ（壁）
-  Object.assign(d.pos.p0, { x: 1.5, y: 12.5, room: 'E' })
+  // 玄関の上の壁へ向かって歩く
+  Object.assign(d.pos.p0, { x: 3.5, y: 12.5, room: 'E' })
   g.input('p0', { type: 'move', dx: 0, dy: -1 }); run(g, 2)
   assert.ok(d.pos.p0.y >= 12.3, '壁を抜けた ' + d.pos.p0.y)
   // 玄関の扉（2,11）の真下から上へ → 食堂に入る
@@ -350,5 +350,184 @@ test('途中退出: 犯人が抜けたら事件解決で終わる。他の人が
     g.removePlayer(inno[0])
     assert.equal(g.view(inno[1]).phase, 'explore')
     assert.equal(g.view(inno[0]).role, null) // 抜けた人の view に秘密は入らない
+  }
+})
+
+// ---------- シナリオ3本・家具の当たり・探索のできごと（3幕）・称号
+import { EVENTS, DARK_VIEW, DARK_SLOW, stageAt } from '../lib/game.mjs'
+const D4 = [[1, 0], [-1, 0], [0, 1], [0, -1]]
+
+test('シナリオ3本: 形が正しく、家具をよけても全部の部屋と家具に届く。扉の前後に家具が無い', () => {
+  assert.deepEqual(SCENARIOS.map(s => s.id), ['mansion', 'ship', 'lodge'])
+  for (const s of SCENARIOS) {
+    const H = s.map.length, W = s.map[0].length
+    for (const row of s.map) assert.equal(row.length, W, s.id)
+    const fur = new Set(s.spots.map(p => p.x + ',' + p.y))
+    assert.equal(fur.size, s.spots.length, `${s.id} 家具が重なっている`)
+    for (const p of s.spots) assert.ok(s.rooms[s.map[p.y][p.x]], `${s.id} ${p.id} が部屋の外`)
+    const ok = (x, y) => x >= 0 && y >= 0 && x < W && y < H && s.map[y][x] !== '#' && !fur.has(x + ',' + y)
+    let st = null
+    for (let y = 0; y < H && !st; y++) for (let x = 0; x < W; x++) if (s.map[y][x] === s.spawnRoom && ok(x, y)) { st = [x, y]; break }
+    const seen = new Set([st.join()]), q = [st]
+    while (q.length) { const [x, y] = q.shift(); for (const [dx, dy] of D4) { const k = [x + dx, y + dy]; if (ok(...k) && !seen.has(k.join())) { seen.add(k.join()); q.push(k) } } }
+    const rooms = new Set([...seen].map(k => { const [x, y] = k.split(',').map(Number); return s.map[y][x] }))
+    for (const r of Object.keys(s.rooms)) assert.ok(rooms.has(r), `${s.id} ${r} に入れない`)
+    for (const p of s.spots) assert.ok(D4.some(([dx, dy]) => seen.has(`${p.x + dx},${p.y + dy}`)), `${s.id} ${p.id} に近づけない`)
+    for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) if (s.map[y][x] === '+') for (const [dx, dy] of D4) assert.ok(!fur.has(`${x + dx},${y + dy}`), `${s.id} 扉(${x},${y})の前に家具`)
+    assert.ok(s.spots.filter(p => p.noClue).length === 1, `${s.id} 遺体は1つ`)
+    assert.ok(s.cast.length >= 8 && s.cast.every(t => s.looks[t]), `${s.id} 肩書きと見た目`)
+    assert.ok(TIMES.intro + s.exploreSec + TIMES.discuss + TIMES.vote <= 300, `${s.id} 5分を超える`)
+    for (const t of s.traits) for (const v of t.values) assert.ok(v.label && v.clue, `${s.id} ${t.key}`)
+  }
+})
+
+test('シナリオ3本とも: 本物の手がかりは特徴の数だけ別々の部屋にあり、全部そろえば犯人は1人に絞れる', () => {
+  for (const s of SCENARIOS) for (const n of [4, 6, 8]) for (let seed = 1; seed <= 25; seed++) {
+    const g = createGame(mkPlayers(n), { rng: seeded(seed), scenario: s.id }), d = g._debug
+    const spots = Object.entries(d.content).filter(([, e]) => e).map(([k]) => s.spots.find(p => p.id === k))
+    assert.equal(spots.length, s.traits.length, s.id)
+    assert.equal(new Set(spots.map(p => s.map[p.y][p.x])).size, s.traits.length, `${s.id} 同じ部屋に2つ`)
+    const c = d.traits[d.culpritId]
+    assert.deepEqual(Object.keys(d.traits).filter(id => s.traits.every(t => d.traits[id][t.key] === c[t.key])), [d.culpritId])
+    assert.equal(g.view('p0').chars.every(ch => typeof ch.look === 'string'), true)
+  }
+})
+
+test('家具は通り抜けられない。玄関の家具の上には誰も置かれない', () => {
+  for (const s of SCENARIOS) {
+    const g = createGame(mkPlayers(8), { rng: seeded(3), scenario: s.id }), d = g._debug
+    for (const id in d.pos) assert.ok(!d.solidTile(Math.floor(d.pos[id].x), Math.floor(d.pos[id].y)), `${s.id} 家具の上に出た`)
+  }
+  const { g, ps, d } = mk(4)
+  toExplore(g, ps)
+  // 食堂の食卓（3,9）の右から左へ歩いても食卓を抜けない
+  Object.assign(d.pos.p0, { x: 4.5, y: 9.5, room: 'D' })
+  g.input('p0', { type: 'move', dx: -1, dy: 0 }); run(g, 1.5)
+  assert.ok(d.pos.p0.x >= 4.29, '食卓を抜けた ' + d.pos.p0.x)
+  // 家具の中に置かれても歩いて出られる
+  placeAt(d, 'p1', 'table')
+  g.input('p1', { type: 'move', dx: 0, dy: 1 }); run(g, 1)
+  assert.ok(!d.solidTile(Math.floor(d.pos.p1.x), Math.floor(d.pos.p1.y)), '家具から出られない')
+})
+
+test('探索は3幕でだんだん難しくなる: 雷の記録 → 停電 → 夜が深まる → 扉が閉じる → 雷', () => {
+  const { g, ps, d } = mk(6, 7)
+  toExplore(g, ps)
+  const E = mansion.exploreSec
+  const v0 = g.view('p0')
+  assert.equal(v0.env.stage, 1); assert.equal(v0.env.dark, false); assert.equal(v0.env.next.kind, 'flash')
+  assert.equal(v0.log.length, 0)
+  run(g, E * 0.22 + 0.2)
+  const v1 = g.view('p0')
+  assert.equal(v1.env.stage, 2); assert.equal(v1.env.dark, true)
+  const flash = v1.log.find(e => e.kind === 'flash')
+  assert.ok(flash, '雷の記録が無い')
+  assert.deepEqual(Object.keys(flash.rooms).sort(), ps.map(p => p.id).sort()) // 全員の居場所
+  for (const p of ps) assert.deepEqual(g.view(p.id).log, v1.log) // 全員に同じ記録
+  assert.ok(v1.log.some(e => e.kind === 'dark'))
+  run(g, E * 0.21)
+  assert.equal(g.view('p0').env.dark, false)
+  run(g, E * 0.10)
+  const v3 = g.view('p0')
+  assert.equal(v3.env.stage, 3); assert.ok(v3.log.some(e => e.kind === 'night'))
+  run(g, E * 0.13)
+  const lock = g.view('p0').log.find(e => e.kind === 'lock')
+  assert.ok(lock, '扉が閉じない')
+  assert.deepEqual(g.view('p0').env.lock, lock.door)
+  assert.equal(mansion.map[lock.door[1]][lock.door[0]], '+')
+  assert.ok(d.solidTile(lock.door[0], lock.door[1]))
+  run(g, E * 0.24)
+  const v5 = g.view('p0')
+  assert.equal(v5.log.filter(e => e.kind === 'flash').length, 2)
+  assert.equal(v5.env.lock, null)
+  assert.ok(!d.solidTile(lock.door[0], lock.door[1]))
+  assert.deepEqual(v5.log.map(e => e.kind), ['flash', 'dark', 'light', 'night', 'lock', 'flash', 'unlock'])
+  assert.equal(stageAt(0.1), 1); assert.equal(stageAt(0.3), 2); assert.equal(stageAt(0.9), 3)
+  assert.equal(EVENTS.length, 7)
+})
+
+test('閉じた扉は通れない（閉じ込められる）', () => {
+  const { g, ps, d } = mk(4, 9)
+  toExplore(g, ps)
+  const E = mansion.exploreSec
+  for (const id in d.pos) Object.assign(d.pos[id], { x: 2.5, y: 13.5, room: 'E' }) // 全員玄関の奥
+  run(g, E * 0.65)
+  const door = g.view('p0').env.lock
+  assert.ok(door)
+  // 閉じた扉の手前から扉へ向かって歩いても、扉のマスに入れない
+  const [x, y] = door
+  const from = mansion.map[y + 1]?.[x] && mansion.map[y + 1][x] !== '#' ? [x + 0.5, y + 1.5, 0, -1] : [x + 0.5, y - 0.5, 0, 1]
+  Object.assign(d.pos.p1, { x: from[0], y: from[1], room: mansion.map[Math.floor(from[1])][x] })
+  g.input('p1', { type: 'move', dx: from[2], dy: from[3] }); run(g, 1)
+  assert.notEqual(`${Math.floor(d.pos.p1.x)},${Math.floor(d.pos.p1.y)}`, `${x},${y}`)
+})
+
+test('停電中: 同じ部屋でも離れた人は見えない。調べる・隠すはどちらも同じだけ遅くなる', () => {
+  const { g, ps, d } = mk(5, 3)
+  toExplore(g, ps)
+  run(g, mansion.exploreSec * 0.22 + 0.2)
+  assert.equal(g.view('p0').env.dark, true)
+  // 廊下の両端に立つ（同じ部屋）
+  Object.assign(d.pos.p0, { x: 1.5, y: 5.5, room: 'H' }); Object.assign(d.pos.p1, { x: 9.5, y: 5.5, room: 'H' })
+  assert.deepEqual(g.view('p0').others.map(o => o.id), [])
+  Object.assign(d.pos.p1, { x: 1.5 + DARK_VIEW - 0.2, y: 5.5, room: 'H' })
+  assert.deepEqual(g.view('p0').others.map(o => o.id), ['p1'])
+  // 犯人の「隠す」と住人の「調べる」は同じ時間（停電の倍率も同じ）
+  const cul = d.culpritId, res = ps.map(p => p.id).find(id => d.roleOf[id] === 'resident' || d.roleOf[id] === 'witness')
+  const ts = traceSpots(d)[0]
+  placeAt(d, cul, ts); placeAt(d, res, ts)
+  g.input(cul, { type: 'act', kind: 'hide', spot: ts }); g.input(res, { type: 'act', kind: 'search', spot: ts })
+  run(g, SEARCH_SEC * 1.1)
+  assert.ok(d.pos[res].busy && d.pos[cul].busy, '停電中なのに遅くならない')
+  run(g, SEARCH_SEC * (DARK_SLOW - 1))
+  assert.equal(d.pos[res].busy, null); assert.equal(d.pos[cul].busy, null)
+})
+
+test('夜が深まると犯人はもう1回偽装できる（それまでは1回）', () => {
+  const { g, ps, d } = mk(4, 5)
+  toExplore(g, ps)
+  const cul = d.culpritId
+  const freeSpots = () => mansion.spots.filter(s => !s.noClue && d.content[s.id] === null).map(s => s.id)
+  const opt = g.view(cul).culprit.fakeOptions[0]
+  placeAt(d, cul, freeSpots()[0])
+  assert.equal(g.input(cul, { type: 'act', kind: 'plant', spot: freeSpots()[0], fake: opt }).ok, true); run(g, 2)
+  placeAt(d, cul, freeSpots()[0])
+  assert.equal(g.input(cul, { type: 'act', kind: 'plant', spot: freeSpots()[0], fake: opt }).error, 'used')
+  assert.equal(g.view(cul).culprit.canPlant, false)
+  run(g, mansion.exploreSec * 0.53)
+  assert.equal(g.view(cul).culprit.canPlant, true)
+  assert.equal(g.view(cul).culprit.plantsLeft, 1)
+  const sp = freeSpots()[0]; placeAt(d, cul, sp)
+  assert.equal(g.input(cul, { type: 'act', kind: 'plant', spot: sp, fake: opt }).ok, true); run(g, 3)
+  assert.equal(g.view(cul).culprit.canPlant, false)
+})
+
+test('称号: 当てた人・濡れ衣・犯人の負け方に名前が付く。称号は結果にだけ入る', () => {
+  {
+    const k = mk(4, 31)
+    const { g, ps, d } = k
+    toExplore(g, ps)
+    const cul = d.culpritId, inno = ps.map(p => p.id).filter(id => id !== cul)
+    const ts = traceSpots(d)[0]
+    placeAt(d, inno[0], ts); g.input(inno[0], { type: 'act', kind: 'search', spot: ts }); run(g, 2)
+    assert.ok(!('award' in g.view(inno[0])) && !JSON.stringify(g.view(inno[0])).includes('stats'))
+    allReady(g, ps); allReady(g, ps)
+    for (const p of ps) g.input(p.id, { type: 'vote', target: p.id === cul ? inno[0] : cul })
+    const r = g.result()
+    const aw = id => r.roles.find(x => x.id === id).award
+    assert.equal(aw(cul), 'unanimous')
+    assert.equal(aw(inno[0]), 'detective')
+    assert.equal(aw(inno[1]), 'hunch')
+    assert.equal(r.roles.find(x => x.id === inno[0]).stats.found, 1)
+  }
+  {
+    const { g, ps, d } = playToVote(4, 32)
+    const cul = d.culpritId, inno = ps.map(p => p.id).filter(id => id !== cul)
+    for (const p of ps) g.input(p.id, { type: 'vote', target: p.id === inno[0] ? inno[1] : inno[0] })
+    const r = g.result()
+    const aw = id => r.roles.find(x => x.id === id).award
+    assert.equal(aw(inno[0]), 'framed')
+    assert.equal(aw(inno[1]), 'accomplice')
+    assert.equal(aw(cul), 'perfect')
   }
 })
