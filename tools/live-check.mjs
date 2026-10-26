@@ -33,10 +33,14 @@ for (const p of pages) await p.waitForSelector('#g-ctrl:not([hidden])', { timeou
 const modes = await Promise.all(pages.map(p => p.evaluate(() => window.__wdiv.mode())))
 check(modes.every(m => m === '3d'), `全員 3D（${modes}）`)
 const w = pages[2]
-const y0 = await w.evaluate(() => window.__wdi.me.y)
-await w.keyboard.down('ArrowUp'); await w.waitForTimeout(600); await w.keyboard.up('ArrowUp'); await w.waitForTimeout(500)
-const y1 = await w.evaluate(() => window.__wdi.me.y)
-check(y1 < y0 - 0.3 || y1 === y0, `webkit から歩く操作が届く（y ${y0} → ${y1}${y1 === y0 ? '・壁' : ''}）`)
+let moved = null
+for (const k of ['ArrowRight', 'ArrowLeft', 'ArrowUp', 'ArrowDown']) {
+  const a = await w.evaluate(() => [window.__wdi.me.x, window.__wdi.me.y])
+  await w.keyboard.down(k); await w.waitForTimeout(600); await w.keyboard.up(k); await w.waitForTimeout(500)
+  const c = await w.evaluate(() => [window.__wdi.me.x, window.__wdi.me.y])
+  if (Math.hypot(c[0] - a[0], c[1] - a[1]) > 0.5) { moved = `${k} ${a} → ${c}`; break }
+}
+check(!!moved, `webkit の操作が公開サーバーに届いて歩ける（${moved}）`)
 for (const p of pages) await p.click('#g-done')
 await h.waitForFunction(() => document.body.dataset.phase === 'discuss', null, { timeout: 20000 })
 for (const p of pages) await p.click('#g-ready')
