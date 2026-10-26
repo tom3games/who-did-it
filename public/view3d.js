@@ -320,8 +320,8 @@ export function createView3D(canvas) {
   const cam = { x: 0, z: 0, far: false, zoom: 1, snap: true, orbit: 0 }
   const tmpV = new THREE.Vector3()
   const ray = new THREE.Raycaster(), ndc = new THREE.Vector2(), groundPlane = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0)
-  const fpsLog = []
-  let lastTierCheck = performance.now() + 4000
+  const fpsLog = []           // 実際のフレームの間隔（秒）。描画用の dt は 0.1 秒で頭打ちにするので、重さの判定には使わない
+  let lastTierCheck = performance.now() + 3000, lastFrameAt = 0
   let flashT = 0
 
   function setTier(t) {
@@ -596,11 +596,14 @@ export function createView3D(canvas) {
       if (!S) return {}
       const now = performance.now(), t = now / 1000
       const dt = Math.min(0.1, f.dt)
-      fpsLog.push(dt); if (fpsLog.length > 90) fpsLog.shift()
-      if (now > lastTierCheck && fpsLog.length >= 60) {
-        lastTierCheck = now + 2500
+      const gap = (now - lastFrameAt) / 1000
+      if (lastFrameAt && gap < 3) { fpsLog.push(gap); if (fpsLog.length > 90) fpsLog.shift() } // 3秒以上あいたのは画面を閉じていた間なので数えない
+      lastFrameAt = now
+      // 2秒ごとに見て、40fps を切っていたら画質を1段下げる（とても重い端末でも数秒で下がるよう、フレーム数ではなく時間で見る）
+      if (now > lastTierCheck && fpsLog.length >= 8) {
+        lastTierCheck = now + 2000
         const fps = fpsLog.length / fpsLog.reduce((a, b) => a + b, 0)
-        if (fps < 40 && tier > 0) setTier(tier - 1)
+        if (fps < 40 && tier > 0) { setTier(tier - 1); fpsLog.length = 0 }
       }
       const labels = []
       const dark = !!f.env?.dark

@@ -43,7 +43,8 @@ export async function playToEnd(pages, { shot, check, srv }) {
   // ホストを家具の前へ → 調べるボタン
   const first = mansion.spots.find(s => !s.noClue)
   tp(ids[0], first.id)
-  await host.waitForFunction(() => !document.querySelector('#g-search').disabled)
+  // 位置が画面に届いて、調べるボタンがその家具を指してから押す（届く前に押すと前の場所の家具を調べに行ってしまう）
+  await host.waitForFunction(n => !document.querySelector('#g-search').disabled && (document.querySelector('#g-search .s2')?.textContent || '').startsWith(n), first.name)
   await host.click('#g-search')
   await host.waitForFunction(() => document.querySelector('#t-note em').textContent === '1', null, { timeout: 5000 })
   check(true, '家具を調べると手帳に1件入る')
